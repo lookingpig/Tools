@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<database-services>
+	<!--服务配置项-->
+	<sql>
+		<key>testquery</key>
+		<statement>select * from test</statement>
+	</sql>
+	
+	<sql>
+		<key>testexecute</key>
+		<statement>insert into test values(null, ?)</statement>
+		<!--语句参数（可配多个）-->
+		<parameter type="string">name</parameter>
+	</sql>
+</database-services>

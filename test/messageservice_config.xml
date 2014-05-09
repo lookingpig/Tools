@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<message-services>
+	<service>
+		<class>服务类路径</class>
+		<key>服务索引</key>
+	</service>
+	
+	<include>子配置文件路径</include>
+</message-services>
