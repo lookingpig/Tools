@@ -74,6 +74,8 @@ public class MessageServiceFactory {
 	 *            配置文件
 	 */
 	public void loadServices(File config) {
+		logger.info("-开始加载消息服务配置文件。");
+		
 		if (null == config) {
 			logger.error("加载消息服务配置文件失败！没有传入配置文件。");
 			return;
@@ -151,5 +153,7 @@ public class MessageServiceFactory {
 			e = (Element) o;
 			loadServices(e.getText());
 		}
+		
+		logger.info("-加载消息服务配置文件完成。");
 	}
 }
