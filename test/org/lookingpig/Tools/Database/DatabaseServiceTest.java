@@ -44,7 +44,7 @@ public class DatabaseServiceTest {
 			Statement stat = coon.createStatement();
 			assertNotNull(stat);
 			
-			ResultSet rs = stat.executeQuery("select * from test");
+			ResultSet rs = stat.executeQuery("select * from durkauto_user");
 			assertNotNull(rs);
 			
 			while (rs.next()) {
@@ -56,7 +56,7 @@ public class DatabaseServiceTest {
 			coon.close();
 		} catch (SQLException e) {
 			e.printStackTrace();
-			fail("»ñÈ¡Êý¾Ý¿âÁ¬½ÓÊ§°Ü£¡");
+			fail("ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ý¿ï¿½ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü£ï¿½");
 		}
 		
 		System.out.println();

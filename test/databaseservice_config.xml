@@ -3,7 +3,7 @@
 	<!--服务配置项-->
 	<sql>
 		<key>testquery</key>
-		<statement>select * from test</statement>
+		<statement>select * from durkauto_user</statement>
 	</sql>
 	
 	<sql>
