@@ -203,26 +203,30 @@ public class DatabaseService {
 			}
 
 			rs = ps.executeQuery();
+			rs.last();
 
 			// 加入表头
-			ResultSetMetaData rmd = rs.getMetaData();
-			column = new ArrayList<String>();
-
-			for (int i = 1; i <= rmd.getColumnCount(); i++) {
-				column.add(rmd.getColumnLabel(i));
-			}
-
-			result.add(column);
-
-			// 加入数据
-			while (rs.next()) {
+			if (0 < rs.getRow()) {
+				rs.beforeFirst();
+				ResultSetMetaData rmd = rs.getMetaData();
 				column = new ArrayList<String>();
-
-				for (String title : result.get(0)) {
-					column.add(rs.getString(title));
+	
+				for (int i = 1; i <= rmd.getColumnCount(); i++) {
+					column.add(rmd.getColumnLabel(i));
 				}
-
+	
 				result.add(column);
+			
+				// 加入数据
+				while (rs.next()) {
+					column = new ArrayList<String>();
+					
+					for (String title : result.get(0)) {
+						column.add(rs.getString(title));
+					}
+					
+					result.add(column);
+				}
 			}
 		} catch (SQLException e) {
 			logger.error("数据服务查询失败！key: " + key, e);
