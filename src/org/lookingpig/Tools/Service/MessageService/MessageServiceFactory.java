@@ -19,8 +19,7 @@ import org.dom4j.io.SAXReader;
  * 
  */
 public class MessageServiceFactory {
-	private static Logger logger = LogManager
-			.getLogger(MessageServiceFactory.class);
+	private static Logger logger = LogManager.getLogger(MessageServiceFactory.class);
 	private static MessageServiceFactory factory;
 	private static final String ELEMENT_PATH_SERVICE = "//service";
 	private static final String ELEMENT_PATH_INCLUDE = "//include";
@@ -64,7 +63,7 @@ public class MessageServiceFactory {
 	 *            配置文件路径
 	 */
 	public void loadServices(String path) {
-		loadServices(new File(path));
+		loadServices(new File(MessageServiceFactory.class.getClassLoader().getResource("/").getPath() + path));
 	}
 
 	/**
@@ -75,14 +74,14 @@ public class MessageServiceFactory {
 	 */
 	public void loadServices(File config) {
 		logger.info("-开始加载消息服务配置文件。");
-		
+
 		if (null == config) {
 			logger.error("加载消息服务配置文件失败！没有传入配置文件。");
 			return;
 		}
 
 		if (!config.exists()) {
-			logger.error("加载消息服务配置文件失败！配置文件不存在。");
+			logger.error("加载消息服务配置文件失败！配置文件不存在，路径：" + config.getPath());
 			return;
 		}
 
@@ -96,7 +95,6 @@ public class MessageServiceFactory {
 			return;
 		}
 
-		services.clear();
 		// 遍历每一个服务配置项目
 		List<?> list = doc.selectNodes(ELEMENT_PATH_SERVICE);
 		Element serviceElement;
@@ -105,34 +103,34 @@ public class MessageServiceFactory {
 		String key;
 		Object service;
 		int index = 0;
-		
+
 		try {
 			for (Object o : list) {
 				serviceElement = (Element) o;
 				e = serviceElement.element(ELEMENT_NAME_CLASS);
-				
+
 				if (null == e) {
 					logger.warn("消息服务配置缺少class！index：" + index);
 					continue;
 				}
-				
+
 				path = e.getText();
 				e = serviceElement.element(ELEMENT_NAME_KEY);
-				
+
 				if (null == e) {
 					logger.warn("消息服务配置缺少key！index：" + index);
 					continue;
 				}
-				
+
 				key = e.getText();
 				service = Class.forName(path).newInstance();
-				
+
 				if (!(service instanceof MessageService)) {
 					logger.warn("消息服务没有实现服务接口！index: " + index);
 					continue;
 				}
-				
-				services.put(key, (MessageService)service);
+
+				services.put(key, (MessageService) service);
 				index++;
 			}
 		} catch (InstantiationException e1) {
@@ -153,7 +151,14 @@ public class MessageServiceFactory {
 			e = (Element) o;
 			loadServices(e.getText());
 		}
-		
+
 		logger.info("-加载消息服务配置文件完成。");
+	}
+	
+	/**
+	 * 清楚服务缓存
+	 */
+	public void clearServiceCatch() {
+		services.clear();
 	}
 }

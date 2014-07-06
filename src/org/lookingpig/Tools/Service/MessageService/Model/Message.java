@@ -15,6 +15,23 @@ public class Message {
 	private String sendTime;
 	private Map<String, String> contents;
 	private Object caller;
+	private Object session;
+
+	/**
+	 * 获得会话
+	 * @return 会话
+	 */
+	public Object getSession() {
+		return session;
+	}
+
+	/**
+	 * 设置会话
+	 * @param session 会话
+	 */
+	public void setSession(Object session) {
+		this.session = session;
+	}
 
 	/**
 	 * 获得发送者

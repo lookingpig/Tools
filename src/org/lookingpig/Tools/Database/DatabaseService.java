@@ -83,8 +83,7 @@ public class DatabaseService {
 		}
 
 		int paramSize = null == parameters ? 0 : parameters.size();
-		int requiredSize = null == sql.getParameters() ? 0 : sql
-				.getParameters().size();
+		int requiredSize = null == sql.getParameters() ? 0 : sql.getParameters().size();
 
 		if (requiredSize > paramSize) {
 			logger.warn("提供参数与服务所需参数不符！kye: " + key);
@@ -99,7 +98,7 @@ public class DatabaseService {
 				}
 			}
 		}
-		
+
 		return true;
 	}
 
@@ -114,8 +113,7 @@ public class DatabaseService {
 	 *            服务参数
 	 * @return 是否添加成功
 	 */
-	private boolean addParameter(PreparedStatement ps,
-			List<Parameter> requiredParams, Map<String, String> params) {
+	private boolean addParameter(PreparedStatement ps, List<Parameter> requiredParams, Map<String, String> params) {
 
 		if (null == requiredParams || 0 == requiredParams.size()) {
 			return true;
@@ -210,21 +208,21 @@ public class DatabaseService {
 				rs.beforeFirst();
 				ResultSetMetaData rmd = rs.getMetaData();
 				column = new ArrayList<String>();
-	
+
 				for (int i = 1; i <= rmd.getColumnCount(); i++) {
 					column.add(rmd.getColumnLabel(i));
 				}
-	
+
 				result.add(column);
-			
+
 				// 加入数据
 				while (rs.next()) {
 					column = new ArrayList<String>();
-					
+
 					for (String title : result.get(0)) {
 						column.add(rs.getString(title));
 					}
-					
+
 					result.add(column);
 				}
 			}
@@ -268,10 +266,9 @@ public class DatabaseService {
 	 *            数据库连接
 	 * @return 是否执行成功
 	 * @throws SQLException
-	 *            执行异常
+	 *             执行异常
 	 */
-	private boolean execute(String key, Map<String, String> parameters,
-			Connection conn) throws SQLException {
+	private boolean execute(String key, Map<String, String> parameters, Connection conn) throws SQLException {
 		boolean success = false;
 
 		if (!checkParameters(key, parameters)) {
@@ -284,7 +281,7 @@ public class DatabaseService {
 
 		try {
 			ps = conn.prepareStatement(sql.getStatement());
-			
+
 			if (!addParameter(ps, sql.getParameters(), parameters)) {
 				return success;
 			}
@@ -341,8 +338,7 @@ public class DatabaseService {
 	 *            服务参数列表
 	 * @return 是否全部成功执行
 	 */
-	public boolean execute(List<String> keys,
-			List<Map<String, String>> parameters) {
+	public boolean execute(List<String> keys, List<Map<String, String>> parameters) {
 		boolean success = false;
 		Connection conn = null;
 
@@ -389,7 +385,7 @@ public class DatabaseService {
 	 *            配置文件
 	 */
 	public void loadService(String path) {
-		loadService(new File(path));
+		loadService(DatabaseService.class.getClassLoader().getResource("/").getPath() + new File(path));
 	}
 
 	/**
