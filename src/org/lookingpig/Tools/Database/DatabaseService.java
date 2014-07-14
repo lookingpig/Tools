@@ -35,7 +35,12 @@ public class DatabaseService {
 	private static final String ELEMENT_NAME_STATEMENT = "statement";
 	private static final String ELEMENT_NAME_PARAMETER = "parameter";
 	private static final String ATTRIBUTE_NAME_TYPE = "type";
+	private static final String ATTRIBUTE_NAME_OPTION = "option";
 	private static final String ATTRIBUTE_TYPE_DEFAULT_VALUE = "string";
+	private static final String ATTRIBUTE_OPTION_DEFAULT_VALUE = "false";
+	private static final String SQL_PARAMETER_FLAG = "?";
+	public static final String SQL_PARAMETER_OPTION_START_FLAG = "{";
+	public static final String SQL_PARAMETER_OPTION_END_FLAG = "}";
 
 	private static ComboPooledDataSource ds;
 	private static Logger logger;
@@ -83,7 +88,7 @@ public class DatabaseService {
 		}
 
 		int paramSize = null == parameters ? 0 : parameters.size();
-		int requiredSize = null == sql.getParameters() ? 0 : sql.getParameters().size();
+		int requiredSize = sql.getMustParameterSize();
 
 		if (requiredSize > paramSize) {
 			logger.warn("提供参数与服务所需参数不符！kye: " + key);
@@ -91,10 +96,15 @@ public class DatabaseService {
 		}
 
 		if (0 != requiredSize) {
+
 			for (Parameter p : sql.getParameters()) {
+
 				if (!parameters.keySet().contains(p.getValue())) {
-					logger.warn("数据服务无法获取足够的所需参数！key: " + key);
-					return false;
+
+					if (!p.isOption()) {
+						logger.warn("数据服务无法获取足够的所需参数！key: " + key);
+						return false;
+					}
 				}
 			}
 		}
@@ -114,53 +124,61 @@ public class DatabaseService {
 	 * @return 是否添加成功
 	 */
 	private boolean addParameter(PreparedStatement ps, List<Parameter> requiredParams, Map<String, String> params) {
-
+		boolean success = true;
+		
 		if (null == requiredParams || 0 == requiredParams.size()) {
-			return true;
+			return success;
 		}
 
 		int index = 1;
-		boolean success = true;
 		String paramValue = null;
 
 		try {
 			for (Parameter p : requiredParams) {
-				paramValue = params.get(p.getValue());
-
-				switch (p.getType()) {
-				case "string":
-					ps.setString(index, paramValue);
-					break;
-				case "int":
-					ps.setInt(index, Integer.parseInt(paramValue));
-					break;
-				case "bool":
-					ps.setBoolean(index, Boolean.parseBoolean(paramValue));
-					break;
-				case "long":
-					ps.setLong(index, Long.parseLong(paramValue));
-					break;
-				case "bigdecimal":
-					ps.setBigDecimal(index, new BigDecimal(paramValue));
-					break;
-				case "byte":
-					ps.setByte(index, Byte.parseByte(paramValue));
-					break;
-				case "bytes":
-					ps.setBytes(index, paramValue.getBytes());
-					break;
-				case "double":
-					ps.setDouble(index, Double.parseDouble(paramValue));
-					break;
-				case "float":
-					ps.setFloat(index, Float.parseFloat(paramValue));
-					break;
-				case "short":
-					ps.setShort(index, Short.parseShort(paramValue));
-					break;
+				if (null != params && params.containsKey(p.getValue())) {
+					paramValue = params.get(p.getValue());
+	
+					switch (p.getType()) {
+					case "string":
+						ps.setString(index, paramValue);
+						break;
+					case "int":
+						ps.setInt(index, Integer.parseInt(paramValue));
+						break;
+					case "bool":
+						ps.setBoolean(index, Boolean.parseBoolean(paramValue));
+						break;
+					case "long":
+						ps.setLong(index, Long.parseLong(paramValue));
+						break;
+					case "bigdecimal":
+						ps.setBigDecimal(index, new BigDecimal(paramValue));
+						break;
+					case "byte":
+						ps.setByte(index, Byte.parseByte(paramValue));
+						break;
+					case "bytes":
+						ps.setBytes(index, paramValue.getBytes());
+						break;
+					case "double":
+						ps.setDouble(index, Double.parseDouble(paramValue));
+						break;
+					case "float":
+						ps.setFloat(index, Float.parseFloat(paramValue));
+						break;
+					case "short":
+						ps.setShort(index, Short.parseShort(paramValue));
+						break;
+					}
+	
+					index++;
+				} else {
+					if (!p.isOption()) {
+						success = false;
+						break;
+					}
+							
 				}
-
-				index++;
 			}
 		} catch (SQLException e) {
 			success = false;
@@ -194,7 +212,7 @@ public class DatabaseService {
 
 		try {
 			conn = getConnection();
-			ps = conn.prepareStatement(sql.getStatement());
+			ps = conn.prepareStatement(sql.getStatement(parameters));
 
 			if (!addParameter(ps, sql.getParameters(), parameters)) {
 				return result;
@@ -280,7 +298,7 @@ public class DatabaseService {
 		PreparedStatement ps = null;
 
 		try {
-			ps = conn.prepareStatement(sql.getStatement());
+			ps = conn.prepareStatement(sql.getStatement(parameters));
 
 			if (!addParameter(ps, sql.getParameters(), parameters)) {
 				return success;
@@ -385,7 +403,7 @@ public class DatabaseService {
 	 *            配置文件
 	 */
 	public void loadService(String path) {
-		loadService(DatabaseService.class.getClassLoader().getResource("/").getPath() + new File(path));
+		loadService(new File(DatabaseService.class.getClassLoader().getResource("/").getPath() + path));
 	}
 
 	/**
@@ -421,7 +439,7 @@ public class DatabaseService {
 		List<?> parameters;
 		Element sqlElement;
 		Element e;
-		String key, statement, type;
+		String key, statement, type, option;
 		SQL sql;
 		int index = 0;
 
@@ -442,12 +460,10 @@ public class DatabaseService {
 			}
 
 			statement = e.getText();
-			sql = new SQL();
-			sql.setKey(key);
-			sql.setStatement(statement);
 
 			// 遍历参数列表
 			parameters = sqlElement.elements(ELEMENT_NAME_PARAMETER);
+			List<Parameter> parames = new ArrayList<Parameter>();
 
 			for (Object parameter : parameters) {
 				e = (Element) parameter;
@@ -460,12 +476,96 @@ public class DatabaseService {
 					type = type.toLowerCase();
 				}
 
-				sql.addParameter(new Parameter(type, e.getText()));
+				// option默认为false
+				option = e.attributeValue(ATTRIBUTE_NAME_OPTION);
+
+				if (null == option || "".equals(option)) {
+					option = ATTRIBUTE_OPTION_DEFAULT_VALUE;
+				} else {
+					option = option.toLowerCase();
+				}
+
+				parames.add(new Parameter(type, e.getText(), Boolean.parseBoolean(option)));
 			}
 
-			sqls.put(key, sql);
+			sql = parseStatement(key, statement, parames);
+
+			if (null != sql) {
+				sqls.put(key, sql);
+			}
+
 			index++;
 		}
+	}
+
+	/**
+	 * 解析语句
+	 * 
+	 * @param key
+	 *            索引
+	 * @param statement
+	 *            语句
+	 * @param parames
+	 *            参数
+	 */
+	private SQL parseStatement(String key, String statement, List<Parameter> parames) {
+		boolean success = true;
+		StringBuffer buf = new StringBuffer(statement);
+		String option = null;
+		int index = 0;
+		int place = -1;
+		List<String> options = new ArrayList<String>();
+
+		//
+		while (-1 != (place = buf.indexOf(SQL_PARAMETER_FLAG, place + 1))) {
+
+			// 可选参数
+			if (SQL_PARAMETER_OPTION_START_FLAG.equals(buf.substring(place + 1, place + 2))) {
+				if (!parames.get(index).isOption()) {
+					success = false;
+					logger.warn("语句参数类型与参数列表类型不符！index: " + index + ", place" + place);
+					break;
+				}
+
+				// 获得可选项
+				option = buf.substring(place + 2, buf.indexOf(SQL_PARAMETER_OPTION_END_FLAG, place));
+				options.add(option);
+				parames.get(index).setOptionIndex(options.size() - 1);
+				
+				buf.deleteCharAt(place);
+				buf.delete(place + 1, buf.indexOf(SQL_PARAMETER_OPTION_END_FLAG, place));
+				buf.insert(place + 1, parames.get(index).getOptionIndex());
+			} else {
+				if (parames.get(index).isOption()) {
+					success = false;
+					logger.warn("语句参数类型与参数列表类型不符！index: " + index + ", place" + place);
+					break;
+				}
+			}
+
+			index++;
+		}
+
+		// 参数列表与所需参数个数不符
+		if (parames.size() != index) {
+			logger.warn("语句参数个数与参数列表个数不符！语句参数：" + (index + 1) + "，参数列表：" + parames.size());
+			success = false;
+		}
+
+		SQL sql = null;
+
+		if (success) {
+			sql = new SQL();
+			sql.setKey(key);
+			sql.setStatement(buf.toString());
+			sql.setParameters(parames);
+
+			for (String o : options) {
+				sql.addOption(o);
+			}
+		}
+
+		return sql;
 	}
 
 	/**

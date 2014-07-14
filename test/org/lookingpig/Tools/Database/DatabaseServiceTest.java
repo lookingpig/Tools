@@ -4,6 +4,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -21,8 +22,15 @@ public class DatabaseServiceTest {
 
 	@BeforeClass
 	public static void testLoadServiceString() {
-		String path = DatabaseServiceTest.class.getResource("/").getPath() + "databaseservice_config.xml";
-		DatabaseService.getService().loadService(path);
+		try {
+			
+			String path = DatabaseServiceTest.class.getResource("/").getPath() + "databaseservice_config.xml";
+			File config = new File(path);
+			DatabaseService.getService().loadService(config);
+		} catch(Exception e) {
+			e.printStackTrace();
+		}
+		
 		Map<String, SQL> sqls = DatabaseService.getService().getSQLs();
 		assertTrue(sqls.size() > 0);
 		
@@ -35,7 +43,6 @@ public class DatabaseServiceTest {
 		System.out.println();
 	}
 
-	@Test
 	public void testGetConnection() {
 		try {
 			Connection coon = DatabaseService.getService().getConnection();
@@ -56,7 +63,7 @@ public class DatabaseServiceTest {
 			coon.close();
 		} catch (SQLException e) {
 			e.printStackTrace();
-			fail("��ȡ���ݿ�����ʧ�ܣ�");
+			fail("");
 		}
 		
 		System.out.println();
@@ -64,7 +71,9 @@ public class DatabaseServiceTest {
 	
 	@Test
 	public void testQuery() {
-		List<List<String>> result = DatabaseService.getService().query("testquery", null);
+		Map<String, String> params = new HashMap<String, String>();
+		params.put("username", "root");
+		List<List<String>> result = DatabaseService.getService().query("testquery", params);
 		assertTrue(0 < result.size());
 		
 		for (List<String> row : result) {
@@ -74,7 +83,7 @@ public class DatabaseServiceTest {
 		System.out.println();
 	}
 	
-	@Test
+	
 	public void testExecute() {
 		Map<String, String> parameters = new HashMap<String, String>();
 		parameters.put("name", "gggg");
@@ -82,7 +91,7 @@ public class DatabaseServiceTest {
 		assertTrue(success);
 	}
 	
-	@Test
+	
 	public void testExecuteList() {
 		List<String> keys = new ArrayList<String>();
 		List<Map<String, String>> parameters = new ArrayList<Map<String, String>>();

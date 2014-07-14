@@ -3,13 +3,7 @@
 	<!--服务配置项-->
 	<sql>
 		<key>testquery</key>
-		<statement>select * from durkauto_user</statement>
-	</sql>
-	
-	<sql>
-		<key>testexecute</key>
-		<statement>insert into test values(null, ?)</statement>
-		<!--语句参数（可配多个）-->
-		<parameter type="string">name</parameter>
+		<statement>select * from durkauto_user ?{where username=?}</statement>
+		<parameter type="string" option="true">username</parameter>
 	</sql>
 </database-services>
