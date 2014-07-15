@@ -125,7 +125,7 @@ public class DatabaseService {
 	 */
 	private boolean addParameter(PreparedStatement ps, List<Parameter> requiredParams, Map<String, String> params) {
 		boolean success = true;
-		
+
 		if (null == requiredParams || 0 == requiredParams.size()) {
 			return success;
 		}
@@ -137,7 +137,7 @@ public class DatabaseService {
 			for (Parameter p : requiredParams) {
 				if (null != params && params.containsKey(p.getValue())) {
 					paramValue = params.get(p.getValue());
-	
+
 					switch (p.getType()) {
 					case "string":
 						ps.setString(index, paramValue);
@@ -170,14 +170,14 @@ public class DatabaseService {
 						ps.setShort(index, Short.parseShort(paramValue));
 						break;
 					}
-	
+
 					index++;
 				} else {
 					if (!p.isOption()) {
 						success = false;
 						break;
 					}
-							
+
 				}
 			}
 		} catch (SQLException e) {
@@ -516,40 +516,44 @@ public class DatabaseService {
 		int place = -1;
 		List<String> options = new ArrayList<String>();
 
-		//
-		while (-1 != (place = buf.indexOf(SQL_PARAMETER_FLAG, place + 1))) {
+		try {
+			// 检查每个参数
+			while (-1 != (place = buf.indexOf(SQL_PARAMETER_FLAG, place + 1))) {
 
-			// 可选参数
-			if (SQL_PARAMETER_OPTION_START_FLAG.equals(buf.substring(place + 1, place + 2))) {
-				if (!parames.get(index).isOption()) {
-					success = false;
-					logger.warn("语句参数类型与参数列表类型不符！index: " + index + ", place" + place);
-					break;
+				// 可选参数
+				if (place + 2 < buf.length() && SQL_PARAMETER_OPTION_START_FLAG.equals(buf.substring(place + 1, place + 2))) {
+					if (!parames.get(index).isOption()) {
+						success = false;
+						logger.warn("语句参数类型与参数列表类型不符！index: " + index + ", place" + place);
+						break;
+					}
+
+					// 获得可选项
+					option = buf.substring(place + 2, buf.indexOf(SQL_PARAMETER_OPTION_END_FLAG, place));
+					options.add(option);
+					parames.get(index).setOptionIndex(options.size() - 1);
+
+					buf.deleteCharAt(place);
+					buf.delete(place + 1, buf.indexOf(SQL_PARAMETER_OPTION_END_FLAG, place));
+					buf.insert(place + 1, parames.get(index).getOptionIndex());
+				} else {
+					if (parames.get(index).isOption()) {
+						success = false;
+						logger.warn("语句参数类型与参数列表类型不符！index: " + index + ", place" + place);
+						break;
+					}
 				}
 
-				// 获得可选项
-				option = buf.substring(place + 2, buf.indexOf(SQL_PARAMETER_OPTION_END_FLAG, place));
-				options.add(option);
-				parames.get(index).setOptionIndex(options.size() - 1);
-				
-				buf.deleteCharAt(place);
-				buf.delete(place + 1, buf.indexOf(SQL_PARAMETER_OPTION_END_FLAG, place));
-				buf.insert(place + 1, parames.get(index).getOptionIndex());
-			} else {
-				if (parames.get(index).isOption()) {
-					success = false;
-					logger.warn("语句参数类型与参数列表类型不符！index: " + index + ", place" + place);
-					break;
-				}
+				index++;
 			}
 
-			index++;
-		}
-
-		// 参数列表与所需参数个数不符
-		if (parames.size() != index) {
-			logger.warn("语句参数个数与参数列表个数不符！语句参数：" + (index + 1) + "，参数列表：" + parames.size());
-			success = false;
+			// 参数列表与所需参数个数不符
+			if (parames.size() != index) {
+				logger.warn("语句参数个数与参数列表个数不符！语句参数：" + (index + 1) + "，参数列表：" + parames.size());
+				success = false;
+			}
+		} catch (Exception e) {
+			logger.error("解析SQL语句异常！key: " + key + ", parameIndex: " + index, e);
 		}
 
 		SQL sql = null;
