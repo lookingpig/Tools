@@ -1,5 +1,7 @@
 package org.lookingpig.Tools.TimingTask;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
@@ -9,12 +11,16 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 /**
  * 时间调度器
  * @author Pig
  *
  */
 public class Scheduler {
+	private static final Logger logger = LogManager.getLogger(Scheduler.class);
 	private static Scheduler scheduler;
 	private Timer timer;
 	private Map<Long, List<Job>> jobs;
@@ -42,10 +48,26 @@ public class Scheduler {
 	 * @param job 要执行的任务
 	 */
 	public void addJob(String time, Job job) {
-		Instant i = Instant.parse(time);
-		long epoch = i.toEpochMilli();
+		addJob(time, "yyyy-MM-dd HH:mm:ss", job);
+	}
+	
+	/**
+	 * 添加定时任务
+	 * @param time 触发时间
+	 * @param format 解析时间的格式
+	 * @param job 要执行的任务
+	 */
+	public void addJob(String time, String format, Job job) {
+		SimpleDateFormat sdf = new SimpleDateFormat(format);
 		
-		addJobToSequence(epoch, job);
+		try {
+			Date d = sdf.parse(time);
+			long epoch = d.getTime();
+			
+			addJobToSequence(epoch, job);
+		} catch (ParseException e) {
+			logger.error("日期格式错误！format: " + format + ", time: " + time, e);
+		}
 	}
 	
 	/**
