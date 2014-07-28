@@ -21,6 +21,7 @@ import org.apache.logging.log4j.Logger;
  */
 public class Scheduler {
 	private static final Logger logger = LogManager.getLogger(Scheduler.class);
+	private static final String DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
 	private static Scheduler scheduler;
 	private Timer timer;
 	private Map<Long, List<Job>> jobs;
@@ -48,7 +49,7 @@ public class Scheduler {
 	 * @param job 要执行的任务
 	 */
 	public void addJob(String time, Job job) {
-		addJob(time, "yyyy-MM-dd HH:mm:ss", job);
+		addJob(time, DATETIME_FORMAT, job);
 	}
 	
 	/**
@@ -100,7 +101,10 @@ public class Scheduler {
 	 */
 	private void addJobToSequence(long sequence, Job job) {
 		if (jobs.containsKey(sequence)) {
-			jobs.get(sequence).add(job);
+			
+			if (!jobs.get(sequence).contains(job)) {
+				jobs.get(sequence).add(job);			
+			}
 		} else {
 			List<Job> jl = new ArrayList<Job>();
 			jl.add(job);
