@@ -12,6 +12,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -22,6 +23,15 @@ import org.apache.logging.log4j.Logger;
  *
  */
 public class NIOSocketServer {
+	/**
+	 * 客户端事件-连接
+	 */
+	public static final int CLIENTEVENT_CONNECT = 1;
+	/**
+	 * 客户端事件-收信
+	 */
+	public static final int CLIENTEVENT_RECEIVE = 2;
+	
 	private static final Logger logger = LogManager.getLogger(NIOSocketServer.class);
 	private ServerSocketChannel server;
 	private Selector selector;
@@ -30,6 +40,7 @@ public class NIOSocketServer {
 	private Charset charset;
 	private SelectorListener listener;
 	private Thread lisnThr;
+	private Map<Integer, List<EventListener>> eventListeners;
 	
 	public NIOSocketServer(String charset, int bufSize) {
 		clients = new ArrayList<SocketChannel>();
@@ -127,6 +138,22 @@ public class NIOSocketServer {
 	}
 	
 	/**
+	 * 注册事件
+	 * @param type 事件类型
+	 * @param listener 监听器
+	 */
+	public void register(int type, EventListener listener) {
+		List<EventListener> listeners = eventListeners.get(type);
+		
+		if (null == listeners) {
+			listeners = new ArrayList<EventListener>();
+			eventListeners.put(type, listeners);
+		}
+		
+		listeners.add(listener);
+	}
+	
+	/**
 	 * 当有客户端请求连接时调用
 	 */
 	private void onConnection() {
@@ -136,6 +163,12 @@ public class NIOSocketServer {
 			client.configureBlocking(false);
 			client.register(selector, SelectionKey.OP_READ);
 			clients.add(client);
+			
+			//触发连接事件
+			ClientEvent event = new ClientEvent();
+			event.setType(CLIENTEVENT_CONNECT);
+			event.setClient(client);
+			onEvent(event);
 		} catch (Exception e) {
 			logger.error("与客户端建立连接失败！原因：", e);
 		}
@@ -154,7 +187,13 @@ public class NIOSocketServer {
 				sb.append(cb.toString());
 				cb.clear();
 				buffer.clear();
-				onMessageComplete(sb.toString());
+				
+				//触发接收消息事件
+				ClientEvent event = new ClientEvent();
+				event.setType(CLIENTEVENT_RECEIVE);
+				event.setClient(client);
+				event.setMessage(sb.toString());
+				onEvent(event);
 			} else {
 				logger.info("与客户端连接已断开。客户端：" + client.socket());
 				clients.remove(client);
@@ -164,13 +203,19 @@ public class NIOSocketServer {
 			logger.error("接收客户端消息失败！原因：", e);
 		}
 	}
-	
+
 	/**
-	 * 接收到一条完整的消息
-	 * @param message 消息
+	 * 当客户端触发事件时调用
+	 * @param event 客户端事件
 	 */
-	private void onMessageComplete(String message) {
-		logger.info("接收到一条来自客户端的消息，内容：" + message);
+	private void onEvent(ClientEvent event) {
+		List<EventListener> listeners = eventListeners.get(event.getType());
+		
+		if (null != listeners) {
+			for (EventListener listener : listeners) {
+				listener.onEvent(event);
+			}
+		}
 	}
 	
 	/**
@@ -199,9 +244,7 @@ public class NIOSocketServer {
 						SelectionKey key = i.next();
 						i.remove();
 						
-						if (!key.isValid()) {
-							System.out.println("关闭");
-						}else if (key.isAcceptable()) {
+						if (key.isAcceptable()) {
 							onConnection();
 						} else if (key.isReadable()) {
 							onMessage((SocketChannel) key.channel());

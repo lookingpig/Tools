@@ -27,6 +27,7 @@ public class AESCryptographService implements CryptographService {
 			.getLogger(AESCryptographService.class);
 	private static String KEY_ALGORITHM = "AES";
 	private static String CIPHER_ALGORITHM = "AES/ECB/PKCS5Padding";
+	private static int DEFAULT_KEY_LENGTH = 256;
 	private CryptographService ornament;
 
 	public AESCryptographService() {
@@ -36,18 +37,28 @@ public class AESCryptographService implements CryptographService {
 		this.ornament = ornament;
 	}
 
+	
 	/**
 	 * 生成一个256位的密匙
 	 * 
 	 * @return 密匙
 	 */
 	public static String generateKey() {
+		return generateKey(DEFAULT_KEY_LENGTH);
+	}
+	
+	/**
+	 * 生成一个密匙
+	 * @param length 密匙长度
+	 * @return 密匙
+	 */
+	public static String generateKey(int lenght) {
 		KeyGenerator kg;
 		String key = null;
 
 		try {
 			kg = KeyGenerator.getInstance(KEY_ALGORITHM);
-			kg.init(256);
+			kg.init(lenght);
 			SecretKey secretKey = kg.generateKey();
 			key = Base64.encodeBase64String(secretKey.getEncoded());
 		} catch (NoSuchAlgorithmException e) {
