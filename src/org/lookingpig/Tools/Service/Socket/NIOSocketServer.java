@@ -10,6 +10,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ public class NIOSocketServer {
 	
 	public NIOSocketServer(String charset, int bufSize) {
 		clients = new ArrayList<SocketChannel>();
+		eventListeners = new HashMap<Integer, List<EventListener>>();
 		buffer = ByteBuffer.allocate(bufSize);
 		this.charset = Charset.forName(charset);
 		listener = new SelectorListener();
@@ -54,7 +56,7 @@ public class NIOSocketServer {
 	 * @param port 端口
 	 * @return 启动是否成功
 	 */
-	public boolean start(int port) {
+	public boolean start(String host, int port) {
 		shutdown();
 		boolean start = true;
 		
@@ -62,7 +64,7 @@ public class NIOSocketServer {
 			selector = Selector.open();
 			server = ServerSocketChannel.open();
 			server.configureBlocking(false);
-			server.socket().bind(new InetSocketAddress(port));
+			server.socket().bind(new InetSocketAddress(host, port));
 			server.register(selector, SelectionKey.OP_ACCEPT);
 			lisnThr = new Thread(listener);
 			lisnThr.start();
@@ -120,6 +122,21 @@ public class NIOSocketServer {
 		buffer.clear();
 		logger.info("成功关闭Socket服务。");
 	}
+	
+	/**
+	 * 向客户端发送消息
+	 * @param client 客户端
+	 * @param message 消息
+	 */
+	public void sendMessage(SocketChannel client, String message) {
+		ByteBuffer bb = ByteBuffer.wrap(message.getBytes());
+		
+		try {
+			client.write(bb);
+		} catch (IOException e) {
+			logger.error("向客户端发送消息发生异常！地址：" + client.socket() + "，原因：", e);
+		}
+	}
 		
 	/**
 	 * 向所有客户端发送消息
@@ -151,6 +168,14 @@ public class NIOSocketServer {
 		}
 		
 		listeners.add(listener);
+	}
+	
+	/**
+	 * 获得已连接客户端列表
+	 * @return 客户端列表
+	 */
+	public List<SocketChannel> getClients() {
+		return clients;
 	}
 	
 	/**
@@ -201,6 +226,14 @@ public class NIOSocketServer {
 			}
 		} catch (IOException e) {
 			logger.error("接收客户端消息失败！原因：", e);
+			if (null != client) {
+			clients.remove(client);
+				try {
+					client.close();
+				} catch (IOException e1) {
+					logger.error("在断开客户端连接时发生异常！原因：", e);
+				}
+			}
 		}
 	}
 
