@@ -2,6 +2,7 @@ package org.lookingpig.Tools.Service.Socket;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.SelectionKey;
@@ -33,10 +34,21 @@ public class NIOSocketServer {
 	 */
 	public static final int CLIENTEVENT_RECEIVE = 2;
 	
+	/**
+	 * 接收缓冲区大小
+	 */
+	private static final int MESSAGE_RCVBUF_size = 32 * 1024;
+	
+	/**
+	 * 消息结束标识
+	 */
+	private static final String MESSAGE_END_FLAG = "@EOM"; 
+	
 	private static final Logger logger = LogManager.getLogger(NIOSocketServer.class);
 	private ServerSocketChannel server;
 	private Selector selector;
-	private List<SocketChannel> clients;
+	private List<Client> clients;
+	private int bufSize;
 	private ByteBuffer buffer;
 	private Charset charset;
 	private SelectorListener listener;
@@ -44,9 +56,10 @@ public class NIOSocketServer {
 	private Map<Integer, List<EventListener>> eventListeners;
 	
 	public NIOSocketServer(String charset, int bufSize) {
-		clients = new ArrayList<SocketChannel>();
+		clients = new ArrayList<Client>();
 		eventListeners = new HashMap<Integer, List<EventListener>>();
-		buffer = ByteBuffer.allocate(bufSize);
+		this.bufSize = bufSize;
+		buffer = ByteBuffer.allocate(this.bufSize);
 		this.charset = Charset.forName(charset);
 		listener = new SelectorListener();
 	}
@@ -64,6 +77,7 @@ public class NIOSocketServer {
 			selector = Selector.open();
 			server = ServerSocketChannel.open();
 			server.configureBlocking(false);
+			server.setOption(StandardSocketOptions.SO_RCVBUF, MESSAGE_RCVBUF_size);
 			server.socket().bind(new InetSocketAddress(host, port));
 			server.register(selector, SelectionKey.OP_ACCEPT);
 			lisnThr = new Thread(listener);
@@ -100,12 +114,8 @@ public class NIOSocketServer {
 		}
 		
 		if (0 < clients.size()) {
-			try {
-				for (SocketChannel client : clients) {
-						client.close();
-				}
-			} catch (IOException e) {
-				logger.error("断开客户端连接时发生异常！原因：", e);
+			for (Client client : clients) {
+					client.close();
 			}
 			clients.clear();
 		}
@@ -122,35 +132,14 @@ public class NIOSocketServer {
 		buffer.clear();
 		logger.info("成功关闭Socket服务。");
 	}
-	
-	/**
-	 * 向客户端发送消息
-	 * @param client 客户端
-	 * @param message 消息
-	 */
-	public void sendMessage(SocketChannel client, String message) {
-		ByteBuffer bb = ByteBuffer.wrap(message.getBytes());
-		
-		try {
-			client.write(bb);
-		} catch (IOException e) {
-			logger.error("向客户端发送消息发生异常！地址：" + client.socket() + "，原因：", e);
-		}
-	}
 		
 	/**
 	 * 向所有客户端发送消息
 	 * @param message 消息
 	 */
 	public void sendMessageToAll(String message) {
-		ByteBuffer bb = ByteBuffer.wrap(message.getBytes());
-		
-		try {
-			for (SocketChannel client: clients) {
-				client.write(bb);
-			}
-		} catch (IOException e) {
-			logger.error("向所有客户端发送消息时发生异常！原因：", e);
+		for (Client client: clients) {
+			client.sendMessage(message);
 		}
 	}
 	
@@ -174,7 +163,7 @@ public class NIOSocketServer {
 	 * 获得已连接客户端列表
 	 * @return 客户端列表
 	 */
-	public List<SocketChannel> getClients() {
+	public List<Client> getClients() {
 		return clients;
 	}
 	
@@ -183,10 +172,11 @@ public class NIOSocketServer {
 	 */
 	private void onConnection() {
 		try {
-			SocketChannel client = server.accept();
-			logger.info("一个客户端连接已经建立，地址：" + client.socket());
-			client.configureBlocking(false);
-			client.register(selector, SelectionKey.OP_READ);
+			SocketChannel channel = server.accept();
+			logger.info("一个客户端连接已经建立，地址：" + channel.socket());
+			channel.configureBlocking(false);
+			channel.register(selector, SelectionKey.OP_READ);
+			Client client = new Client(channel);
 			clients.add(client);
 			
 			//触发连接事件
@@ -202,37 +192,45 @@ public class NIOSocketServer {
 	/**
 	 * 当接收到来自客户端消息时调用
 	 */
-	private void onMessage(SocketChannel client) {
+	private void onMessage(SocketChannel channel) {
+		Client client = getClient(channel);
+		
 		try {
 			CharBuffer cb;
-			StringBuffer sb = new StringBuffer();
+			StringBuffer buf = client.getMessageBuf();
+			int size = 0;
 			
-			if (0 < client.read(buffer)) {
+			size = channel.read(buffer);
+			
+			if (0 < size) {
 				cb = charset.decode((ByteBuffer) buffer.flip());
-				sb.append(cb.toString());
+				buf.append(cb.toString());
 				cb.clear();
 				buffer.clear();
+				logger.info("接收到客户端报文，大小：" + size + "，内容：" + cb);
 				
-				//触发接收消息事件
-				ClientEvent event = new ClientEvent();
-				event.setType(CLIENTEVENT_RECEIVE);
-				event.setClient(client);
-				event.setMessage(sb.toString());
-				onEvent(event);
+				if (buf.toString().endsWith(MESSAGE_END_FLAG)) {
+					buf.delete(buf.lastIndexOf(MESSAGE_END_FLAG), buf.length());
+					//触发接收消息事件
+					ClientEvent event = new ClientEvent();
+					event.setType(CLIENTEVENT_RECEIVE);
+					event.setClient(client);
+					event.setMessage(buf.toString().replaceAll("\r\n", "").replaceAll("\n", ""));
+					onEvent(event); 
+					buf.delete(0, buf.length());
+				}
 			} else {
-				logger.info("与客户端连接已断开。客户端：" + client.socket());
+				logger.info("与客户端连接已断开。客户端：" + channel.socket());
 				clients.remove(client);
 				client.close();
+				return;
 			}
 		} catch (IOException e) {
 			logger.error("接收客户端消息失败！原因：", e);
+			
 			if (null != client) {
-			clients.remove(client);
-				try {
-					client.close();
-				} catch (IOException e1) {
-					logger.error("在断开客户端连接时发生异常！原因：", e);
-				}
+				client.close();
+				clients.remove(client);				
 			}
 		}
 	}
@@ -247,6 +245,128 @@ public class NIOSocketServer {
 		if (null != listeners) {
 			for (EventListener listener : listeners) {
 				listener.onEvent(event);
+			}
+		}
+	}
+	
+	/**
+	 * 获取客户端对象
+	 * @param channel 客户端连接
+	 * @return 客户端对象
+	 */
+	private Client getClient(SocketChannel channel) {
+		for (Client client : clients) {
+			if (client.equals(channel)) {
+				return client;
+			}
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * 客户端
+	 * @author Pig
+	 *
+	 */
+	public class Client {
+		private SocketChannel client;
+		private StringBuffer messageBuf;
+		private Map<String, String> attribute;
+		
+		public Client(SocketChannel client) {
+			this.client = client;
+			messageBuf = new StringBuffer();
+			attribute = new HashMap<String, String>();
+		}
+		
+		/**
+		 * 向客户端发送消息
+		 * @param client 客户端
+		 * @param message 消息
+		 */
+		public void sendMessage(String message) {
+			message += MESSAGE_END_FLAG;
+			ByteBuffer bb = ByteBuffer.wrap(message.getBytes());
+			
+			try {
+				client.write(bb);
+			} catch (IOException e) {
+				logger.error("向客户端发送消息发生异常！地址：" + client.socket() + "，原因：", e);
+			}
+		}
+		
+		/**
+		 * 断开与客户端的连接
+		 */
+		public void close() {
+			try {
+				client.close();
+			} catch (IOException e) {
+				logger.error("断开客户端连接时发生异常！原因：", e);
+			}
+		}
+		
+		/**
+		 * 获得获得客户端通讯对象
+		 * @return 通讯对象
+		 */
+		public SocketChannel getChannel() {
+			return client;
+		}
+		
+		/**
+		 * 设置客户端属性
+		 * @param key 键
+		 * @param value 值
+		 */
+		public void setAttribute(String key, String value) {
+			attribute.put(key, value);
+		}
+		
+		/**
+		 * 获得客户端属性
+		 * @param key 键
+		 * @return
+		 */
+		public String getAttribute(String key) {
+			return attribute.get(key);
+		}
+		
+		/**
+		 * 获得消息缓冲区
+		 * @return 缓冲区
+		 */
+		public StringBuffer getMessageBuf() {
+			return messageBuf;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (null == obj) {
+				return false;
+			} else if (obj instanceof Client) {
+				return compareClient(this.client, ((Client) obj).getChannel());
+			} else if (obj instanceof SocketChannel) {
+				return compareClient(this.client, (SocketChannel) obj);
+			} else {
+				return false;
+			}
+		}
+		
+		/**
+		 * 比较客户端
+		 * @param c1 客户端1
+		 * @param c2 客户端2
+		 * @return 是否相同
+		 */
+		private boolean compareClient(SocketChannel c1, SocketChannel c2) {
+			if (c1.socket().getPort() == c2.socket().getPort()
+					&& c1.socket().getInetAddress().getHostAddress()
+							.equals(c2.socket().getInetAddress().getHostAddress())) {
+				return true;
+			} else {
+				return false;
 			}
 		}
 	}

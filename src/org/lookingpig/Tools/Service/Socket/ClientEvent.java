@@ -1,6 +1,5 @@
 package org.lookingpig.Tools.Service.Socket;
 
-import java.nio.channels.SocketChannel;
 
 /**
  * 事件
@@ -8,7 +7,7 @@ import java.nio.channels.SocketChannel;
  *
  */
 public class ClientEvent {
-	private SocketChannel client;
+	private NIOSocketServer.Client client;
 	private int type;
 	private String message;
 	
@@ -20,7 +19,7 @@ public class ClientEvent {
 	 * 获得触发事件的客户端
 	 * @return 客户端
 	 */
-	public SocketChannel getClient() {
+	public NIOSocketServer.Client getClient() {
 		return client;
 	}
 	
@@ -28,7 +27,7 @@ public class ClientEvent {
 	 * 设置触发事件的客户端
 	 * @param client 客户端
 	 */
-	public void setClient(SocketChannel client) {
+	public void setClient(NIOSocketServer.Client client) {
 		this.client = client;
 	}
 	
