@@ -9,7 +9,7 @@ public class MessageFactoryTest {
 
 	@Test
 	public void testResolve() {
-		String message = "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <message> 	<sender>发送人</sender> 	<send-number>发送号码</send-number> 	<send-time>发送时间</send-time> 	<contents>发送内容 		<key>value</key> 	</contents> </message>";
+		String message = "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <message> 	<sender>aaa</sender> 	<send-number>000</send-number> 	<send-time>2014-08-08 11:12:32</send-time> 	<contents>	<key>value</key> 	</contents> </message>";
 		System.out.println(message);
 		
 		Message m = MessageFactory.getFactory().resolve(message);

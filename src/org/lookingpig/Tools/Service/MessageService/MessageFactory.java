@@ -2,6 +2,7 @@ package org.lookingpig.Tools.Service.MessageService;
 
 import java.util.Iterator;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.dom4j.Document;
@@ -60,7 +61,7 @@ public class MessageFactory {
 			
 			while (i.hasNext()) {
 				e = (Element) i.next();
-				m.addContent(e.getName(), e.getText());
+				m.addContent(e.getName(), new String(Base64.decodeBase64(e.getText())));
 			}
 		} catch (DocumentException e) {
 			logger.error("消息解析为xml失败，message: " + message, e);
@@ -87,7 +88,7 @@ public class MessageFactory {
 		Element contents = root.addElement(ELEMENT_NAME_CONTENTS);
 		
 		for (String key : message.getContents().keySet()) {
-			contents.addElement(key).setText(message.getContent(key));
+			contents.addElement(key).addCDATA(Base64.encodeBase64String(message.getContent(key).getBytes()));
 		}
 		
 		return doc.asXML();
